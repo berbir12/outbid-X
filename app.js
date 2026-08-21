@@ -1,6 +1,6 @@
 let marketers = [];
-let bid = 50;
-let minimumBid = 50;
+let bid = 1;
+let minimumBid = 1;
 
 const price = document.querySelector('#claimPrice');
 const board = document.querySelector('#leaderboard');
@@ -53,8 +53,8 @@ function openCheckout() {
   dialog.showModal();
 }
 
-document.querySelector('#minusBid').addEventListener('click', () => updateBid(-50));
-document.querySelector('#plusBid').addEventListener('click', () => updateBid(50));
+document.querySelector('#minusBid').addEventListener('click', () => updateBid(-1));
+document.querySelector('#plusBid').addEventListener('click', () => updateBid(1));
 document.querySelector('#quickBidForm').addEventListener('submit', event => { event.preventDefault(); openCheckout(); });
 document.querySelector('#headerBid').addEventListener('click', () => { document.querySelector('.bid-panel').scrollIntoView({ behavior: 'smooth', block: 'center' }); handleInput.focus({ preventScroll: true }); });
 document.querySelector('#closeDialog').addEventListener('click', () => dialog.close());

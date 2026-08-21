@@ -71,7 +71,7 @@ app.get('/api/leaderboard', async (_request, response) => {
       bid: row.amount_cents / 100, avatarUrl: row.avatar_url
     }));
     const leadingCents = Number(data?.[0]?.amount_cents) || 0;
-    response.json({ marketers, minimumBid: (leadingCents ? leadingCents + 5000 : Number(process.env.MINIMUM_BID_CENTS || 5000)) / 100 });
+    response.json({ marketers, minimumBid: (leadingCents ? leadingCents + 100 : Number(process.env.MINIMUM_BID_CENTS || 100)) / 100 });
   } catch (error) {
     console.error('Leaderboard error:', error.message);
     response.status(503).json({ error: 'Leaderboard is temporarily unavailable.' });
@@ -84,9 +84,9 @@ app.post('/api/checkout', async (request, response) => {
     const { supabase, dodo } = services();
     const handle = normalizeHandle(request.body.handle);
     const amountCents = Math.round(Number(request.body.amount) * 100);
-    const minimumCents = Number(process.env.MINIMUM_BID_CENTS || 5000);
+    const minimumCents = Number(process.env.MINIMUM_BID_CENTS || 100);
     const { data: leader } = await supabase.from('bids').select('amount_cents').eq('status', 'paid').order('amount_cents', { ascending: false }).limit(1).maybeSingle();
-    const requiredCents = leader?.amount_cents ? Number(leader.amount_cents) + 5000 : minimumCents;
+    const requiredCents = leader?.amount_cents ? Number(leader.amount_cents) + 100 : minimumCents;
     if (!Number.isSafeInteger(amountCents) || amountCents < requiredCents) return response.status(400).json({ error: `Minimum bid is $${(requiredCents / 100).toLocaleString()}.` });
 
     const { data: marketer, error: marketerError } = await supabase.from('marketers').upsert({ handle }, { onConflict: 'handle' }).select('id').single();

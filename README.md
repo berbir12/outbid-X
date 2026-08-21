@@ -4,7 +4,7 @@
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase and Dodo values.
 2. In Supabase, open **SQL Editor**, paste `supabase/migrations/001_outbid_x.sql`, and run it once.
-3. In Dodo Payments, use a **One Time** product with **Pay What You Want** enabled and a minimum price of `$50`.
+3. In Dodo Payments, use a **One Time** product with **Pay What You Want** enabled and a minimum price of `$1`.
 4. Add a Dodo webhook pointing to `https://YOUR_DOMAIN/api/webhooks/dodo` and subscribe to:
    - `payment.succeeded`
    - `payment.processing`
