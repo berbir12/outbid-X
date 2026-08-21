@@ -248,54 +248,75 @@ app.get('/api/x-profile', async (request, response) => {
 
 const activeSessions = new Map();
 const clicksMap = new Map();
-let totalPageViews = 0;
 
-function getStats() {
+// Increment the persistent view counter in Supabase and return the new total.
+// Falls back to an in-memory counter if the analytics table doesn't exist yet.
+let fallbackViews = 0;
+async function incrementTotalViews(supabase) {
+  try {
+    const { data, error } = await supabase.rpc('increment_analytics', { key_name: 'total_views' });
+    if (!error && data != null) return Number(data);
+  } catch { /* fall through */ }
+  // Fallback: in-memory (resets on restart but won't crash)
+  fallbackViews += 1;
+  return fallbackViews;
+}
+
+async function getTotalViews(supabase) {
+  try {
+    const { data, error } = await supabase.from('analytics').select('value').eq('key', 'total_views').single();
+    if (!error && data) return Number(data.value);
+  } catch { /* fall through */ }
+  return fallbackViews;
+}
+
+function getOnlineCount() {
   const now = Date.now();
   for (const [id, time] of activeSessions.entries()) {
     if (now - time > 120000) activeSessions.delete(id);
   }
-  return {
-    online: activeSessions.size,
-    totalViews: totalPageViews
-  };
+  return activeSessions.size;
 }
 
-function recordPresence(sessionId) {
-  if (sessionId) {
-    if (!activeSessions.has(sessionId)) {
-      totalPageViews += 1;
-    }
-    activeSessions.set(sessionId, Date.now());
-  }
-}
-
-app.post('/api/heartbeat', (request, response) => {
+app.post('/api/heartbeat', async (request, response) => {
   const sessionId = request.body?.sessionId || request.headers['x-session-id'] || request.ip;
-  recordPresence(sessionId);
-  response.json(getStats());
+  let totalViews = fallbackViews;
+  try {
+    const { supabase } = services();
+    const isNew = !activeSessions.has(sessionId);
+    activeSessions.set(sessionId, Date.now());
+    if (isNew) {
+      totalViews = await incrementTotalViews(supabase);
+    } else {
+      totalViews = await getTotalViews(supabase);
+    }
+  } catch { /* ignore */ }
+  response.json({ online: getOnlineCount(), totalViews });
 });
 
 app.post('/api/track-click', async (request, response) => {
   try {
     const handle = request.body?.handle;
     if (!handle) return response.status(400).json({ error: 'Handle required' });
-    const current = (clicksMap.get(handle) || 0) + 1;
-    clicksMap.set(handle, current);
 
-    // Try persisting to Supabase if column exists
+    // Persist clicks atomically. Keep an in-memory delta only while the database
+    // is unavailable so a restart never makes successfully stored clicks vanish.
     try {
       const { supabase } = services();
-      const { data: marketer } = await supabase.from('marketers').select('id, clicks').eq('handle', handle).maybeSingle();
-      if (marketer) {
-        const dbClicks = (Number(marketer.clicks) || 0) + 1;
-        await supabase.from('marketers').update({ clicks: dbClicks }).eq('id', marketer.id);
-      }
-    } catch {
-      // Ignore if table/column does not exist
+      const pendingClicks = clicksMap.get(handle) || 0;
+      const { data, error } = await supabase.rpc('increment_marketer_clicks', {
+        marketer_handle: handle,
+        increment_by: pendingClicks + 1
+      });
+      if (error) throw error;
+      clicksMap.delete(handle);
+      return response.json({ success: true, clicks: Number(data) });
+    } catch (error) {
+      console.warn('Using temporary click counter:', error.message);
+      const current = (clicksMap.get(handle) || 0) + 1;
+      clicksMap.set(handle, current);
+      return response.json({ success: true, clicks: current, pending: true });
     }
-
-    response.json({ success: true, clicks: current });
   } catch (err) {
     console.error('Click tracking error:', err.message);
     response.status(500).json({ error: 'Failed to record click' });
@@ -305,9 +326,21 @@ app.post('/api/track-click', async (request, response) => {
 app.get('/api/leaderboard', async (request, response) => {
   try {
     const sessionId = request.query?.sessionId || request.headers['x-session-id'];
-    if (sessionId) recordPresence(sessionId);
-
     const { supabase } = services();
+
+    // Record presence and get persistent view count
+    let totalViews = fallbackViews;
+    if (sessionId) {
+      const isNew = !activeSessions.has(sessionId);
+      activeSessions.set(sessionId, Date.now());
+      if (isNew) {
+        totalViews = await incrementTotalViews(supabase);
+      } else {
+        totalViews = await getTotalViews(supabase);
+      }
+    } else {
+      totalViews = await getTotalViews(supabase);
+    }
     const { data, error } = await supabase.from('leaderboard').select('*').order('amount_cents', { ascending: false }).order('paid_at', { ascending: true }).limit(100);
     if (error) throw error;
     const marketers = (data || []).map(row => ({
@@ -322,7 +355,7 @@ app.get('/api/leaderboard', async (request, response) => {
       bid: row.amount_cents / 100,
       avatarUrl: row.avatar_url
     }));
-    const stats = getStats();
+    const stats = { online: getOnlineCount(), totalViews };
     response.json({
       marketers,
       minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100,
