@@ -50,6 +50,9 @@ async function fetchXProfile(input) {
   if (xResponse.status === 403) {
     const error = new Error('The X developer app does not have access to user lookup. Check the app plan and permissions.'); error.status = 502; throw error;
   }
+  if (xResponse.status === 402) {
+    const error = new Error('X API credits are required to verify accounts. Add credits in the X Developer Console.'); error.status = 502; throw error;
+  }
   if (!xResponse.ok || !payload.data) {
     console.error('X lookup failed:', xResponse.status, payload.errors?.[0]?.title || payload.title || 'Unknown X API error');
     const error = new Error(`X profile lookup failed with API status ${xResponse.status}.`); error.status = 502; throw error;
@@ -68,27 +71,110 @@ async function fetchXProfile(input) {
   };
 }
 
+async function applySuccessfulPayment(supabase, { bidId, paymentId, checkoutSessionId, amountCents, currency, payload, webhookId }) {
+  let targetBidId = bidId;
+
+  // If bidId is missing, attempt to resolve via checkout_session_id or payment_id
+  if (!targetBidId && checkoutSessionId) {
+    const { data: b } = await supabase.from('bids').select('id, amount_cents').eq('dodo_checkout_session_id', checkoutSessionId).maybeSingle();
+    if (b) targetBidId = b.id;
+  }
+  if (!targetBidId && paymentId) {
+    const { data: p } = await supabase.from('payments').select('bid_id, amount_cents').eq('dodo_payment_id', paymentId).maybeSingle();
+    if (p) targetBidId = p.bid_id;
+  }
+
+  if (!targetBidId) {
+    console.warn('applySuccessfulPayment: Unable to find target bid for', { bidId, paymentId, checkoutSessionId });
+    return { success: false, error: 'Target bid not found' };
+  }
+
+  // Try RPC first
+  try {
+    const { error: rpcError } = await supabase.rpc('process_dodo_payment', {
+      p_webhook_id: webhookId || `manual_${paymentId || targetBidId}_${Date.now()}`,
+      p_event_type: 'payment.succeeded',
+      p_payment_id: paymentId || null,
+      p_bid_id: targetBidId,
+      p_amount_cents: amountCents || 0,
+      p_currency: currency || 'USD',
+      p_payload: payload || {}
+    });
+    if (!rpcError) return { success: true, bidId: targetBidId };
+    console.warn('RPC process_dodo_payment had an error, using direct DB update:', rpcError.message);
+  } catch (err) {
+    console.warn('RPC call threw exception, falling back to direct DB update:', err.message);
+  }
+
+  // Direct DB update fallback
+  const now = new Date().toISOString();
+  const { error: bidUpdateError } = await supabase.from('bids').update({
+    status: 'paid',
+    paid_at: now,
+    updated_at: now
+  }).eq('id', targetBidId);
+
+  if (bidUpdateError) throw bidUpdateError;
+
+  await supabase.from('payments').update({
+    dodo_payment_id: paymentId || null,
+    amount_cents: amountCents || 0,
+    currency: currency || 'USD',
+    status: 'succeeded',
+    raw_payload: payload || {},
+    updated_at: now
+  }).eq('bid_id', targetBidId);
+
+  return { success: true, bidId: targetBidId };
+}
+
 app.post('/api/webhooks/dodo', express.raw({ type: 'application/json' }), async (request, response) => {
   try {
     const secret = required('DODO_WEBHOOK_SECRET');
     const verifier = new Webhook(secret);
-    const payloadText = request.body.toString('utf8');
+    const payloadText = Buffer.isBuffer(request.body)
+      ? request.body.toString('utf8')
+      : typeof request.body === 'string'
+      ? request.body
+      : JSON.stringify(request.body);
+
     const event = verifier.verify(payloadText, {
-      'webhook-id': request.get('webhook-id'),
-      'webhook-timestamp': request.get('webhook-timestamp'),
-      'webhook-signature': request.get('webhook-signature')
+      'webhook-id': request.get('webhook-id') || request.get('Webhook-Id') || request.get('svix-id'),
+      'webhook-timestamp': request.get('webhook-timestamp') || request.get('Webhook-Timestamp') || request.get('svix-timestamp'),
+      'webhook-signature': request.get('webhook-signature') || request.get('Webhook-Signature') || request.get('svix-signature')
     });
+
     if (!String(event.type).startsWith('payment.')) return response.status(200).json({ received: true });
-    const bidId = event.data?.metadata?.bid_id;
-    if (!bidId) throw new Error('Webhook is missing bid metadata.');
+
     const { supabase } = services();
-    const { error } = await supabase.rpc('process_dodo_payment', {
-      p_webhook_id: request.get('webhook-id'), p_event_type: event.type,
-      p_payment_id: event.data.payment_id, p_bid_id: bidId,
-      p_amount_cents: event.data.total_amount, p_currency: event.data.currency,
-      p_payload: event
-    });
-    if (error) throw error;
+    const bidId = event.data?.metadata?.bid_id;
+    const checkoutSessionId = event.data?.checkout_session_id;
+    const paymentId = event.data?.payment_id;
+    const amountCents = event.data?.total_amount;
+    const currency = event.data?.currency;
+
+    if (event.type === 'payment.succeeded') {
+      await applySuccessfulPayment(supabase, {
+        bidId,
+        paymentId,
+        checkoutSessionId,
+        amountCents,
+        currency,
+        payload: event,
+        webhookId: request.get('webhook-id') || request.get('Webhook-Id') || request.get('svix-id')
+      });
+    } else {
+      await supabase.rpc('process_dodo_payment', {
+        p_webhook_id: request.get('webhook-id') || request.get('Webhook-Id') || `wh_${Date.now()}`,
+        p_event_type: event.type,
+        p_payment_id: paymentId,
+        p_bid_id: bidId,
+        p_amount_cents: amountCents,
+        p_currency: currency,
+        p_payload: event
+      }).catch(err => console.warn('Non-success webhook error:', err.message));
+    }
+
     response.status(200).json({ received: true });
   } catch (error) {
     console.error('Dodo webhook error:', error.message);
@@ -97,6 +183,63 @@ app.post('/api/webhooks/dodo', express.raw({ type: 'application/json' }), async 
 });
 
 app.use(express.json({ limit: '100kb' }));
+
+app.get('/api/verify-payment', async (request, response) => {
+  try {
+    const paymentId = request.query.payment_id;
+    const checkoutSessionId = request.query.checkout_session_id || request.query.session_id;
+    const bidId = request.query.bid_id;
+
+    const { supabase, dodo } = services();
+
+    // If payment_id is provided, verify directly with Dodo Payments API
+    if (paymentId) {
+      const payment = await dodo.payments.retrieve(paymentId);
+      if (payment && payment.status === 'succeeded') {
+        const resolvedBidId = payment.metadata?.bid_id || bidId;
+        const result = await applySuccessfulPayment(supabase, {
+          bidId: resolvedBidId,
+          paymentId: payment.payment_id,
+          checkoutSessionId: payment.checkout_session_id,
+          amountCents: payment.total_amount,
+          currency: payment.currency,
+          payload: payment
+        });
+        return response.json({
+          verified: true,
+          status: 'paid',
+          handle: payment.metadata?.handle,
+          amount: payment.total_amount / 100,
+          bidId: result.bidId
+        });
+      }
+      return response.json({ verified: false, status: payment?.status || 'unknown' });
+    }
+
+    // Check bid status directly in Supabase
+    if (bidId || checkoutSessionId) {
+      let query = supabase.from('bids').select('*, marketers(*)');
+      if (bidId) query = query.eq('id', bidId);
+      else if (checkoutSessionId) query = query.eq('dodo_checkout_session_id', checkoutSessionId);
+      const { data: bid, error } = await query.maybeSingle();
+      if (error) throw error;
+      if (bid) {
+        return response.json({
+          verified: bid.status === 'paid',
+          status: bid.status,
+          handle: bid.marketers?.handle,
+          amount: bid.amount_cents / 100,
+          bidId: bid.id
+        });
+      }
+    }
+
+    response.status(400).json({ error: 'Provide payment_id, checkout_session_id, or bid_id.' });
+  } catch (error) {
+    console.error('Verify payment error:', error.message);
+    response.status(500).json({ error: error.message || 'Could not verify payment.' });
+  }
+});
 
 app.get('/api/x-profile', async (request, response) => {
   try { response.json(await fetchXProfile(request.query.handle)); }
@@ -147,7 +290,7 @@ app.post('/api/checkout', async (request, response) => {
     const checkout = await dodo.checkoutSessions.create({
       product_cart: [{ product_id: required('DODO_PRODUCT_ID'), quantity: 1, amount: amountCents }],
       metadata: { bid_id: bidId, handle },
-      return_url: `${required('APP_URL').replace(/\/$/, '')}/?payment=complete`,
+      return_url: `${required('APP_URL').replace(/\/$/, '')}/?payment=complete&bid_id=${bidId}`,
       customization: { theme: 'light', show_order_details: true }
     });
     await supabase.from('bids').update({ dodo_checkout_session_id: checkout.session_id }).eq('id', bidId);

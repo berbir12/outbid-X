@@ -7,7 +7,7 @@ const board = document.querySelector('#leaderboard');
 const dialog = document.querySelector('#checkoutDialog');
 const handleInput = document.querySelector('#handleInput');
 const money = value => `$${Number(value).toLocaleString()}`;
-const initials = name => name.split(' ').map(part => part[0]).join('').slice(0, 2);
+const initials = name => (name || 'X').split(' ').map(part => part[0]).join('').slice(0, 2);
 
 async function readApiResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -23,8 +23,20 @@ function render() {
     return;
   }
   board.innerHTML = marketers.map((marketer, index) => `<article class="card">
-    <div class="rank-wrap"><div class="rank">#${index + 1}</div><div class="identity"><div class="avatar" style="--avatar:${marketer.color || '#6558f5'}">${initials(marketer.name)}</div><div><h2>${marketer.name}</h2><p>${marketer.title || ''}</p><small>${marketer.handle}${marketer.category ? ` · ${marketer.category}` : ''}</small></div></div></div>
-    <div class="metrics"><strong>${marketer.followers || '—'}</strong> followers<br><strong>${marketer.engagement || '—'}</strong> engagement</div>
+    <div class="rank-wrap">
+      <div class="rank">#${index + 1}</div>
+      <div class="identity">
+        <div class="avatar" style="--avatar:${marketer.color || '#6558f5'}">
+          ${marketer.avatarUrl ? `<img src="${marketer.avatarUrl}" alt="${marketer.name}" onerror="this.remove()" />` : initials(marketer.name)}
+        </div>
+        <div>
+          <h2>${marketer.name}</h2>
+          <p>${marketer.title || ''}</p>
+          <small>${marketer.handle}${marketer.category ? ` · ${marketer.category}` : ''}</small>
+        </div>
+      </div>
+    </div>
+    <div class="metrics"><strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers<br><strong>${marketer.engagement || '—'}</strong> engagement</div>
     <div class="amount">${money(marketer.bid)}</div>
   </article>`).join('');
 }
@@ -47,6 +59,55 @@ async function loadLeaderboard() {
     updateMarket(response.ok ? await response.json() : {});
   } catch { updateMarket(); }
   finally { setTimeout(() => board.classList.remove('refreshing'), 300); }
+}
+
+async function handlePaymentRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const isPaymentReturn = params.has('payment') || params.has('payment_id') || params.has('bid_id');
+  if (!isPaymentReturn) return;
+
+  const paymentId = params.get('payment_id');
+  const bidId = params.get('bid_id');
+  const toast = document.querySelector('#paymentNotification');
+
+  if (toast) {
+    toast.className = 'payment-toast processing';
+    toast.innerHTML = '<span>⚡ Verifying payment with Dodo Payments...</span>';
+    toast.hidden = false;
+  }
+
+  try {
+    const query = new URLSearchParams();
+    if (paymentId) query.set('payment_id', paymentId);
+    if (bidId) query.set('bid_id', bidId);
+
+    const response = await fetch(`/api/verify-payment?${query.toString()}`);
+    const data = await readApiResponse(response);
+
+    if (data.verified) {
+      if (toast) {
+        toast.className = 'payment-toast';
+        toast.innerHTML = `<span>🎉 Payment confirmed! <strong>${data.handle || 'Your profile'}</strong> is now live on the leaderboard.</span><button type="button" onclick="this.parentElement.hidden=true">✕</button>`;
+      }
+      await loadLeaderboard();
+      document.querySelector('.leaderboard-section')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      if (toast) {
+        toast.className = 'payment-toast processing';
+        toast.innerHTML = '<span>⏳ Payment is processing. Refreshing rankings...</span>';
+      }
+      await loadLeaderboard();
+    }
+  } catch (err) {
+    console.error('Payment verification failed:', err);
+    if (toast) {
+      toast.className = 'payment-toast';
+      toast.innerHTML = '<span>Payment received! Updating leaderboard...</span><button type="button" onclick="this.parentElement.hidden=true">✕</button>';
+    }
+    await loadLeaderboard();
+  } finally {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 }
 
 function updateBid(change) { bid = Math.max(minimumBid, bid + change); price.textContent = money(bid); }
@@ -123,3 +184,4 @@ document.querySelector('#dodoCheckout').addEventListener('click', async () => {
 
 render();
 loadLeaderboard();
+handlePaymentRedirect();
