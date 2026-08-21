@@ -308,5 +308,5 @@ app.use(express.static(root, { extensions: ['html'] }));
 export default app;
 
 if (!process.env.VERCEL) {
-  app.listen(port, () => console.log(`Outbid X running on http://localhost:${port}`));
+  app.listen(port, () => console.log(`Top Marketers running on http://localhost:${port}`));
 }
