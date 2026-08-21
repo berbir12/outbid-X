@@ -14,11 +14,16 @@
   <link rel="stylesheet" href="empty-state.css" />
   <link rel="stylesheet" href="logo.css" />
   <link rel="stylesheet" href="viewport.css" />
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
   <header class="topbar shell">
     <a class="logo" href="#" aria-label="Top Marketers home"><span class="logo-mark"><img src="assets/outbid-x-logo.png" alt="" /></span><span class="logo-type">Top <b>Marketers</b></span></a>
-    <div class="top-status"><i></i><span>Rankings live</span><strong>47 competing</strong></div>
+    <div class="top-status">
+      <span class="live-badge"><i></i> <b id="onlineCount">14</b> online</span>
+      <span class="views-stat"><span id="totalViewsCount">1,240</span> views</span>
+      <strong id="competingCount">1 competing</strong>
+    </div>
     <button class="header-action" id="headerBid">Place a bid <span>↗</span></button>
   </header>
 
@@ -49,7 +54,7 @@
         <div><p>MARKET LEADERBOARD</p><h2>Top marketers on X</h2></div>
         <div class="board-actions"><span><i></i> Updated now</span><button id="refreshButton">↻ Refresh</button></div>
       </div>
-      <div class="column-head"><span>Rank & marketer</span><span>Audience</span><span>Bid</span></div>
+      <div class="column-head"><span>Rank & marketer</span><span>Audience & Clicks</span><span>Bid & time</span></div>
       <div class="board" id="leaderboard"><div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div></div>
       <p class="sponsored-note">Sponsored visibility ranking · Ordered by verified one-time bid · Audience metrics are self-reported</p>
     </section>

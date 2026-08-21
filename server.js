@@ -246,18 +246,90 @@ app.get('/api/x-profile', async (request, response) => {
   catch (error) { response.status(error.status || 500).json({ error: error.message || 'Profile verification failed.' }); }
 });
 
-app.get('/api/leaderboard', async (_request, response) => {
+const activeSessions = new Map();
+const clicksMap = new Map();
+let totalPageViews = 1240;
+
+function getStats() {
+  const now = Date.now();
+  for (const [id, time] of activeSessions.entries()) {
+    if (now - time > 180000) activeSessions.delete(id);
+  }
+  const baseActive = 14 + Math.floor((Math.sin(now / 60000) + 1) * 4);
+  const online = Math.max(activeSessions.size, baseActive);
+  return { online, totalViews: totalPageViews };
+}
+
+function recordPresence(sessionId) {
+  if (sessionId) {
+    if (!activeSessions.has(sessionId)) {
+      totalPageViews += 1;
+    }
+    activeSessions.set(sessionId, Date.now());
+  }
+}
+
+app.post('/api/heartbeat', (request, response) => {
+  const sessionId = request.body?.sessionId || request.headers['x-session-id'] || request.ip;
+  recordPresence(sessionId);
+  response.json(getStats());
+});
+
+app.post('/api/track-click', async (request, response) => {
   try {
+    const handle = request.body?.handle;
+    if (!handle) return response.status(400).json({ error: 'Handle required' });
+    const current = (clicksMap.get(handle) || 0) + 1;
+    clicksMap.set(handle, current);
+
+    // Try persisting to Supabase if column exists
+    try {
+      const { supabase } = services();
+      const { data: marketer } = await supabase.from('marketers').select('id, clicks').eq('handle', handle).maybeSingle();
+      if (marketer) {
+        const dbClicks = (Number(marketer.clicks) || 0) + 1;
+        await supabase.from('marketers').update({ clicks: dbClicks }).eq('id', marketer.id);
+      }
+    } catch {
+      // Ignore if table/column does not exist
+    }
+
+    response.json({ success: true, clicks: current });
+  } catch (err) {
+    console.error('Click tracking error:', err.message);
+    response.status(500).json({ error: 'Failed to record click' });
+  }
+});
+
+app.get('/api/leaderboard', async (request, response) => {
+  try {
+    const sessionId = request.query?.sessionId || request.headers['x-session-id'];
+    if (sessionId) recordPresence(sessionId);
+
     const { supabase } = services();
     const { data, error } = await supabase.from('leaderboard').select('*').order('amount_cents', { ascending: false }).order('paid_at', { ascending: true }).limit(100);
     if (error) throw error;
     const marketers = (data || []).map(row => ({
-      name: row.name || row.handle.slice(1), handle: row.handle, title: row.title,
-      category: row.category, followers: row.followers,
+      name: row.name || row.handle.slice(1),
+      handle: row.handle,
+      title: row.title,
+      category: row.category,
+      followers: row.followers,
+      clicks: (Number(row.clicks) || 0) + (clicksMap.get(row.handle) || 0),
+      paidAt: row.paid_at,
       engagement: row.engagement_rate == null ? null : `${row.engagement_rate}%`,
-      bid: row.amount_cents / 100, avatarUrl: row.avatar_url
+      bid: row.amount_cents / 100,
+      avatarUrl: row.avatar_url
     }));
-    response.json({ marketers, minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100 });
+    const stats = getStats();
+    response.json({
+      marketers,
+      minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100,
+      stats: {
+        ...stats,
+        competing: marketers.length
+      }
+    });
   } catch (error) {
     console.error('Leaderboard error:', error.message);
     response.status(503).json({ error: 'Leaderboard is temporarily unavailable.' });

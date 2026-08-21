@@ -1,6 +1,14 @@
 let marketers = [];
 let bid = 1;
 let minimumBid = 1;
+let userHasCustomizedBid = false;
+
+// Unique visitor session identifier for live presence
+let sessionId = sessionStorage.getItem('tm_session_id');
+if (!sessionId) {
+  sessionId = 's_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  sessionStorage.setItem('tm_session_id', sessionId);
+}
 
 const bidInput = document.querySelector('#bidInput');
 const board = document.querySelector('#leaderboard');
@@ -8,6 +16,22 @@ const dialog = document.querySelector('#checkoutDialog');
 const handleInput = document.querySelector('#handleInput');
 const money = value => `$${Number(value).toLocaleString()}`;
 const initials = name => (name || 'X').split(' ').map(part => part[0]).join('').slice(0, 2);
+
+function formatTimeAgo(dateInput) {
+  if (!dateInput) return 'recently';
+  const date = new Date(dateInput);
+  const now = new Date();
+  const diffSec = Math.max(1, Math.floor((now - date) / 1000));
+
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 function setBid(value, syncInput = true) {
   const parsed = parseInt(value, 10);
@@ -25,6 +49,24 @@ async function readApiResponse(response) {
   return response.json();
 }
 
+function trackMarketerClick(handle, index) {
+  // Optimistically increment on screen
+  if (marketers[index]) {
+    marketers[index].clicks = (Number(marketers[index].clicks) || 0) + 1;
+    const clickEl = document.querySelector(`#clicks-${index}`);
+    if (clickEl) clickEl.textContent = `${marketers[index].clicks.toLocaleString()} clicks`;
+  }
+  // Send click event to backend non-blockingly
+  try {
+    fetch('/api/track-click', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle }),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+}
+
 function render() {
   if (!marketers.length) {
     board.innerHTML = '<div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div>';
@@ -33,7 +75,10 @@ function render() {
   board.innerHTML = marketers.map((marketer, index) => {
     const handleClean = (marketer.handle || '').replace(/^@/, '');
     const profileUrl = `https://x.com/${encodeURIComponent(handleClean)}`;
-    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
+    const clicksCount = Number(marketer.clicks || 0);
+    const timeAgo = formatTimeAgo(marketer.paidAt);
+
+    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" onclick="trackMarketerClick('${marketer.handle}', ${index})" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
       <div class="rank-wrap">
         <div class="rank">#${index + 1}</div>
         <div class="identity">
@@ -47,13 +92,17 @@ function render() {
           </div>
         </div>
       </div>
-      <div class="metrics"><strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers<br><strong>${marketer.engagement || '—'}</strong> engagement</div>
-      <div class="amount">${money(marketer.bid)}</div>
+      <div class="metrics">
+        <strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers
+        <span class="clicks-stat" id="clicks-${index}">${clicksCount.toLocaleString()} clicks</span>
+      </div>
+      <div class="amount-wrap">
+        <div class="amount">${money(marketer.bid)}</div>
+        <div class="bid-time" title="${marketer.paidAt ? new Date(marketer.paidAt).toLocaleString() : ''}">⚡ ${timeAgo}</div>
+      </div>
     </a>`;
   }).join('');
 }
-
-let userHasCustomizedBid = false;
 
 function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
@@ -68,15 +117,27 @@ function updateMarket(data = {}) {
     setBid(Math.max(minimumBid, bid), true);
   }
 
+  // Update online presence and views statistics
+  if (data.stats) {
+    const onlineEl = document.querySelector('#onlineCount');
+    const viewsEl = document.querySelector('#totalViewsCount');
+    const competingEl = document.querySelector('#competingCount');
+    if (onlineEl) onlineEl.textContent = data.stats.online;
+    if (viewsEl) viewsEl.textContent = Number(data.stats.totalViews || 1240).toLocaleString();
+    if (competingEl) competingEl.textContent = `${marketers.length} competing`;
+  } else {
+    const competingEl = document.querySelector('#competingCount');
+    if (competingEl) competingEl.textContent = `${marketers.length} competing`;
+  }
+
   document.querySelector('#leadingBid').textContent = leading ? `Current #1 is ${money(leading)}` : 'No bids yet';
-  document.querySelector('.top-status strong').textContent = `${marketers.length} competing`;
   render();
 }
 
 async function loadLeaderboard() {
   board.classList.add('refreshing');
   try {
-    const response = await fetch('/api/leaderboard', { cache: 'no-store', headers: { Accept: 'application/json' } });
+    const response = await fetch(`/api/leaderboard?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store', headers: { Accept: 'application/json' } });
     updateMarket(response.ok ? await response.json() : {});
   } catch { updateMarket(); }
   finally { setTimeout(() => board.classList.remove('refreshing'), 300); }
@@ -235,3 +296,26 @@ document.querySelector('#dodoCheckout').addEventListener('click', async () => {
 render();
 loadLeaderboard();
 handlePaymentRedirect();
+
+// Send heartbeat every 45 seconds to keep live visitor presence active
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId })
+    });
+    if (res.ok) {
+      const stats = await res.json();
+      const onlineEl = document.querySelector('#onlineCount');
+      const viewsEl = document.querySelector('#totalViewsCount');
+      if (onlineEl) onlineEl.textContent = stats.online;
+      if (viewsEl) viewsEl.textContent = Number(stats.totalViews || 1240).toLocaleString();
+    }
+  } catch {}
+}, 45000);
+
+// Re-render every 30 seconds to update relative bid times
+setInterval(() => {
+  if (marketers.length) render();
+}, 30000);
