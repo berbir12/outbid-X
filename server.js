@@ -154,4 +154,9 @@ app.post('/api/checkout', async (request, response) => {
 });
 
 app.use(express.static(root, { extensions: ['html'] }));
-app.listen(port, () => console.log(`Outbid X running on http://localhost:${port}`));
+
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(port, () => console.log(`Outbid X running on http://localhost:${port}`));
+}
