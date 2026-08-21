@@ -44,8 +44,15 @@ async function fetchXProfile(input) {
   if (xResponse.status === 429) {
     const error = new Error('X lookup limit reached. Try again shortly.'); error.status = 429; throw error;
   }
+  if (xResponse.status === 401) {
+    const error = new Error('X rejected the API token. Check the X_BEARER_TOKEN production environment variable.'); error.status = 502; throw error;
+  }
+  if (xResponse.status === 403) {
+    const error = new Error('The X developer app does not have access to user lookup. Check the app plan and permissions.'); error.status = 502; throw error;
+  }
   if (!xResponse.ok || !payload.data) {
-    const error = new Error('X could not verify this account right now.'); error.status = 502; throw error;
+    console.error('X lookup failed:', xResponse.status, payload.errors?.[0]?.title || payload.title || 'Unknown X API error');
+    const error = new Error(`X profile lookup failed with API status ${xResponse.status}.`); error.status = 502; throw error;
   }
   const user = payload.data;
   return {
