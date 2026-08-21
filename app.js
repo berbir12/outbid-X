@@ -24,7 +24,7 @@ function render() {
 function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
   const leading = Number(marketers[0]?.bid) || 0;
-  minimumBid = Number(data.minimumBid) || (leading ? leading + 50 : 50);
+  minimumBid = Number(data.minimumBid) || 1;
   bid = minimumBid;
   price.textContent = money(bid);
   document.querySelector('#leadingBid').textContent = leading ? `Current #1 is ${money(leading)}` : 'No bids yet';
@@ -35,7 +35,7 @@ function updateMarket(data = {}) {
 async function loadLeaderboard() {
   board.classList.add('refreshing');
   try {
-    const response = await fetch('/api/leaderboard', { headers: { Accept: 'application/json' } });
+    const response = await fetch('/api/leaderboard', { cache: 'no-store', headers: { Accept: 'application/json' } });
     updateMarket(response.ok ? await response.json() : {});
   } catch { updateMarket(); }
   finally { setTimeout(() => board.classList.remove('refreshing'), 300); }
