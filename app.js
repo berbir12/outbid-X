@@ -22,23 +22,27 @@ function render() {
     board.innerHTML = '<div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div>';
     return;
   }
-  board.innerHTML = marketers.map((marketer, index) => `<article class="card">
-    <div class="rank-wrap">
-      <div class="rank">#${index + 1}</div>
-      <div class="identity">
-        <div class="avatar" style="--avatar:${marketer.color || '#6558f5'}">
-          ${marketer.avatarUrl ? `<img src="${marketer.avatarUrl}" alt="${marketer.name}" onerror="this.remove()" />` : initials(marketer.name)}
-        </div>
-        <div>
-          <h2>${marketer.name}</h2>
-          <p>${marketer.title || ''}</p>
-          <small>${marketer.handle}${marketer.category ? ` · ${marketer.category}` : ''}</small>
+  board.innerHTML = marketers.map((marketer, index) => {
+    const handleClean = (marketer.handle || '').replace(/^@/, '');
+    const profileUrl = `https://x.com/${encodeURIComponent(handleClean)}`;
+    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
+      <div class="rank-wrap">
+        <div class="rank">#${index + 1}</div>
+        <div class="identity">
+          <div class="avatar" style="--avatar:${marketer.color || '#6558f5'}">
+            ${marketer.avatarUrl ? `<img src="${marketer.avatarUrl}" alt="${marketer.name}" onerror="this.remove()" />` : initials(marketer.name)}
+          </div>
+          <div>
+            <h2>${marketer.name}</h2>
+            <p>${marketer.title || ''}</p>
+            <small>${marketer.handle}${marketer.category ? ` · ${marketer.category}` : ''}</small>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="metrics"><strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers<br><strong>${marketer.engagement || '—'}</strong> engagement</div>
-    <div class="amount">${money(marketer.bid)}</div>
-  </article>`).join('');
+      <div class="metrics"><strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers<br><strong>${marketer.engagement || '—'}</strong> engagement</div>
+      <div class="amount">${money(marketer.bid)}</div>
+    </a>`;
+  }).join('');
 }
 
 function updateMarket(data = {}) {
