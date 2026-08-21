@@ -249,27 +249,6 @@ app.get('/api/x-profile', async (request, response) => {
 const activeSessions = new Map();
 const clicksMap = new Map();
 
-// Increment the persistent view counter in Supabase and return the new total.
-// Falls back to an in-memory counter if the analytics table doesn't exist yet.
-let fallbackViews = 0;
-async function incrementTotalViews(supabase) {
-  try {
-    const { data, error } = await supabase.rpc('increment_analytics', { key_name: 'total_views' });
-    if (!error && data != null) return Number(data);
-  } catch { /* fall through */ }
-  // Fallback: in-memory (resets on restart but won't crash)
-  fallbackViews += 1;
-  return fallbackViews;
-}
-
-async function getTotalViews(supabase) {
-  try {
-    const { data, error } = await supabase.from('analytics').select('value').eq('key', 'total_views').single();
-    if (!error && data) return Number(data.value);
-  } catch { /* fall through */ }
-  return fallbackViews;
-}
-
 function getOnlineCount() {
   const now = Date.now();
   for (const [id, time] of activeSessions.entries()) {
@@ -280,18 +259,8 @@ function getOnlineCount() {
 
 app.post('/api/heartbeat', async (request, response) => {
   const sessionId = request.body?.sessionId || request.headers['x-session-id'] || request.ip;
-  let totalViews = fallbackViews;
-  try {
-    const { supabase } = services();
-    const isNew = !activeSessions.has(sessionId);
-    activeSessions.set(sessionId, Date.now());
-    if (isNew) {
-      totalViews = await incrementTotalViews(supabase);
-    } else {
-      totalViews = await getTotalViews(supabase);
-    }
-  } catch { /* ignore */ }
-  response.json({ online: getOnlineCount(), totalViews });
+  activeSessions.set(sessionId, Date.now());
+  response.json({ online: getOnlineCount() });
 });
 
 app.post('/api/track-click', async (request, response) => {
@@ -328,18 +297,9 @@ app.get('/api/leaderboard', async (request, response) => {
     const sessionId = request.query?.sessionId || request.headers['x-session-id'];
     const { supabase } = services();
 
-    // Record presence and get persistent view count
-    let totalViews = fallbackViews;
+    // Record presence. Page views are tracked by Vercel Web Analytics in index.html.
     if (sessionId) {
-      const isNew = !activeSessions.has(sessionId);
       activeSessions.set(sessionId, Date.now());
-      if (isNew) {
-        totalViews = await incrementTotalViews(supabase);
-      } else {
-        totalViews = await getTotalViews(supabase);
-      }
-    } else {
-      totalViews = await getTotalViews(supabase);
     }
     const { data, error } = await supabase.from('leaderboard').select('*').order('amount_cents', { ascending: false }).order('paid_at', { ascending: true }).limit(100);
     if (error) throw error;
@@ -355,7 +315,7 @@ app.get('/api/leaderboard', async (request, response) => {
       bid: row.amount_cents / 100,
       avatarUrl: row.avatar_url
     }));
-    const stats = { online: getOnlineCount(), totalViews };
+    const stats = { online: getOnlineCount() };
     response.json({
       marketers,
       minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100,

@@ -117,13 +117,11 @@ function updateMarket(data = {}) {
     setBid(Math.max(minimumBid, bid), true);
   }
 
-  // Update online presence and views statistics
+  // Update live presence and leaderboard statistics.
   if (data.stats) {
     const onlineEl = document.querySelector('#onlineCount');
-    const viewsEl = document.querySelector('#totalViewsCount');
     const competingEl = document.querySelector('#competingCount');
     if (onlineEl) onlineEl.textContent = data.stats.online;
-    if (viewsEl) viewsEl.textContent = Number(data.stats.totalViews || 0).toLocaleString();
     if (competingEl) competingEl.textContent = `${marketers.length} competing`;
   } else {
     const competingEl = document.querySelector('#competingCount');
@@ -308,9 +306,7 @@ setInterval(async () => {
     if (res.ok) {
       const stats = await res.json();
       const onlineEl = document.querySelector('#onlineCount');
-      const viewsEl = document.querySelector('#totalViewsCount');
       if (onlineEl) onlineEl.textContent = stats.online;
-      if (viewsEl) viewsEl.textContent = Number(stats.totalViews || 0).toLocaleString();
     }
   } catch {}
 }, 45000);
