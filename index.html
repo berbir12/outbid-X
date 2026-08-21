@@ -36,8 +36,8 @@
         <label for="handleInput">X handle or profile URL</label>
         <div class="handle-field"><span>𝕏</span><input id="handleInput" placeholder="@yourhandle" required /></div>
         <div class="profile-preview" id="profilePreview" hidden></div>
-        <label>Bid amount</label>
-        <div class="amount-control"><button type="button" id="minusBid">−</button><strong id="claimPrice">$1</strong><button type="button" id="plusBid">+</button></div>
+        <label for="bidInput">Bid amount</label>
+        <div class="amount-control"><button type="button" id="minusBid" aria-label="Decrease bid">−</button><div class="amount-input-wrap"><span class="currency-prefix">$</span><input type="number" id="bidInput" min="1" step="1" value="1" aria-label="Bid amount in USD" /></div><button type="button" id="plusBid" aria-label="Increase bid">+</button></div>
         <p>Your amount determines the highest available position.</p>
         <button class="submit-bid" type="submit">Continue to bid <span>→</span></button>
       </form>

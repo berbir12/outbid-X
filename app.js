@@ -2,12 +2,20 @@ let marketers = [];
 let bid = 1;
 let minimumBid = 1;
 
-const price = document.querySelector('#claimPrice');
+const bidInput = document.querySelector('#bidInput');
 const board = document.querySelector('#leaderboard');
 const dialog = document.querySelector('#checkoutDialog');
 const handleInput = document.querySelector('#handleInput');
 const money = value => `$${Number(value).toLocaleString()}`;
 const initials = name => (name || 'X').split(' ').map(part => part[0]).join('').slice(0, 2);
+
+function setBid(value, syncInput = true) {
+  const parsed = parseInt(value, 10);
+  bid = isNaN(parsed) ? minimumBid : Math.max(minimumBid, parsed);
+  if (syncInput && bidInput && document.activeElement !== bidInput) {
+    bidInput.value = bid;
+  }
+}
 
 async function readApiResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -45,12 +53,21 @@ function render() {
   }).join('');
 }
 
+let userHasCustomizedBid = false;
+
 function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
   const leading = Number(marketers[0]?.bid) || 0;
   minimumBid = Number(data.minimumBid) || 1;
-  bid = minimumBid;
-  price.textContent = money(bid);
+  if (bidInput) bidInput.min = minimumBid;
+
+  const defaultOutbid = leading ? leading + 1 : minimumBid;
+  if (!userHasCustomizedBid) {
+    setBid(defaultOutbid, true);
+  } else {
+    setBid(Math.max(minimumBid, bid), true);
+  }
+
   document.querySelector('#leadingBid').textContent = leading ? `Current #1 is ${money(leading)}` : 'No bids yet';
   document.querySelector('.top-status strong').textContent = `${marketers.length} competing`;
   render();
@@ -114,7 +131,19 @@ async function handlePaymentRedirect() {
   }
 }
 
-function updateBid(change) { bid = Math.max(minimumBid, bid + change); price.textContent = money(bid); }
+function updateBid(change) {
+  const highestBid = Number(marketers[0]?.bid) || 0;
+  userHasCustomizedBid = true;
+  if (change > 0) {
+    if (highestBid > 0 && bid <= highestBid) {
+      setBid(highestBid + 1, true);
+    } else {
+      setBid(bid + change, true);
+    }
+  } else {
+    setBid(bid + change, true);
+  }
+}
 function estimatedRank(value) { const index = marketers.findIndex(marketer => value > marketer.bid); return index === -1 ? marketers.length + 1 : index + 1; }
 function openCheckout() {
   const handle = handleInput.value.trim();
@@ -158,6 +187,23 @@ async function verifyXProfile() {
     button.disabled = false;
     button.firstChild.textContent = 'Continue to bid ';
   }
+}
+
+if (bidInput) {
+  bidInput.addEventListener('input', () => {
+    userHasCustomizedBid = true;
+    const val = parseInt(bidInput.value, 10);
+    if (!isNaN(val) && val >= 1) {
+      bid = val;
+    }
+  });
+  bidInput.addEventListener('change', () => {
+    userHasCustomizedBid = true;
+    setBid(bidInput.value, true);
+  });
+  bidInput.addEventListener('blur', () => {
+    setBid(bidInput.value, true);
+  });
 }
 
 document.querySelector('#minusBid').addEventListener('click', () => updateBid(-1));
