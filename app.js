@@ -9,6 +9,14 @@ const handleInput = document.querySelector('#handleInput');
 const money = value => `$${Number(value).toLocaleString()}`;
 const initials = name => name.split(' ').map(part => part[0]).join('').slice(0, 2);
 
+async function readApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('The application API is not running. Start the Node server and try again.');
+  }
+  return response.json();
+}
+
 function render() {
   if (!marketers.length) {
     board.innerHTML = '<div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div>';
@@ -64,7 +72,7 @@ async function verifyXProfile() {
   button.firstChild.textContent = 'Verifying account ';
   try {
     const response = await fetch(`/api/x-profile?handle=${encodeURIComponent(handleInput.value.trim())}`);
-    const profile = await response.json();
+    const profile = await readApiResponse(response);
     if (!response.ok) throw new Error(profile.error || 'This X account could not be verified.');
     handleInput.value = profile.handle;
     preview.replaceChildren();
@@ -104,7 +112,7 @@ document.querySelector('#dodoCheckout').addEventListener('click', async () => {
   button.disabled = true; warning.hidden = true;
   try {
     const response = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ handle: handleInput.value.trim(), amount: bid }) });
-    const result = await response.json();
+    const result = await readApiResponse(response);
     if (!response.ok || !result.checkoutUrl) throw new Error(result.error || 'Checkout could not be created.');
     window.location.assign(result.checkoutUrl);
   } catch (error) {
