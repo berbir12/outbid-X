@@ -3,7 +3,7 @@
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and fill in the Supabase and Dodo values.
-2. In Supabase, open **SQL Editor**, paste `supabase/migrations/001_outbid_x.sql`, and run it once.
+2. In Supabase, open **SQL Editor** and run both migrations in order: `001_outbid_x.sql`, then `002_x_profiles.sql`.
 3. In Dodo Payments, use a **One Time** product with **Pay What You Want** enabled and a minimum price of `$1`.
 4. Add a Dodo webhook pointing to `https://YOUR_DOMAIN/api/webhooks/dodo` and subscribe to:
    - `payment.succeeded`
@@ -12,6 +12,10 @@
    - `payment.cancelled`
 5. Put the webhook signing secret in `DODO_WEBHOOK_SECRET`.
 6. Run `npm run dev`.
+
+## X profile verification
+
+Create an app in the X Developer Console, copy its app-only Bearer Token, and set `X_BEARER_TOKEN` in `.env.local`. Outbid X uses the official `GET /2/users/by/username/:username` endpoint to validate the account and fetch its public profile fields before checkout. The token remains server-side.
 
 ## Data and payment flow
 

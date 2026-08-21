@@ -25,7 +25,7 @@ function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
   const leading = Number(marketers[0]?.bid) || 0;
   minimumBid = Number(data.minimumBid) || (leading ? leading + 50 : 50);
-  bid = Math.max(bid, minimumBid);
+  bid = minimumBid;
   price.textContent = money(bid);
   document.querySelector('#leadingBid').textContent = leading ? `Current #1 is ${money(leading)}` : 'No bids yet';
   document.querySelector('.top-status strong').textContent = `${marketers.length} competing`;
@@ -53,9 +53,47 @@ function openCheckout() {
   dialog.showModal();
 }
 
+async function verifyXProfile() {
+  const button = document.querySelector('.submit-bid');
+  const field = document.querySelector('.handle-field');
+  const preview = document.querySelector('#profilePreview');
+  document.querySelector('.handle-error')?.remove();
+  field.classList.remove('invalid');
+  preview.hidden = true;
+  button.disabled = true;
+  button.firstChild.textContent = 'Verifying account ';
+  try {
+    const response = await fetch(`/api/x-profile?handle=${encodeURIComponent(handleInput.value.trim())}`);
+    const profile = await response.json();
+    if (!response.ok) throw new Error(profile.error || 'This X account could not be verified.');
+    handleInput.value = profile.handle;
+    preview.replaceChildren();
+    if (profile.avatarUrl) { const image = document.createElement('img'); image.src = profile.avatarUrl; image.alt = ''; preview.append(image); }
+    const details = document.createElement('div');
+    const name = document.createElement('strong'); name.textContent = profile.name;
+    const metrics = document.createElement('span'); metrics.textContent = `${profile.handle} · ${Number(profile.followers || 0).toLocaleString()} followers`;
+    details.append(name, metrics);
+    const verified = document.createElement('b'); verified.textContent = 'VERIFIED';
+    preview.append(details, verified);
+    preview.hidden = false;
+    return profile;
+  } catch (error) {
+    field.classList.add('invalid');
+    const message = document.createElement('p'); message.className = 'handle-error'; message.textContent = error.message; field.after(message);
+    return null;
+  } finally {
+    button.disabled = false;
+    button.firstChild.textContent = 'Continue to bid ';
+  }
+}
+
 document.querySelector('#minusBid').addEventListener('click', () => updateBid(-1));
 document.querySelector('#plusBid').addEventListener('click', () => updateBid(1));
-document.querySelector('#quickBidForm').addEventListener('submit', event => { event.preventDefault(); openCheckout(); });
+document.querySelector('#quickBidForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (await verifyXProfile()) openCheckout();
+});
+handleInput.addEventListener('input', () => { document.querySelector('#profilePreview').hidden = true; document.querySelector('.handle-error')?.remove(); document.querySelector('.handle-field').classList.remove('invalid'); });
 document.querySelector('#headerBid').addEventListener('click', () => { document.querySelector('.bid-panel').scrollIntoView({ behavior: 'smooth', block: 'center' }); handleInput.focus({ preventScroll: true }); });
 document.querySelector('#closeDialog').addEventListener('click', () => dialog.close());
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });

@@ -29,6 +29,38 @@ function normalizeHandle(input) {
   return handle;
 }
 
+async function fetchXProfile(input) {
+  const handle = normalizeHandle(input);
+  const username = handle.slice(1);
+  const fields = 'created_at,description,entities,location,name,profile_image_url,protected,public_metrics,url,username,verified';
+  const xResponse = await fetch(`https://api.x.com/2/users/by/username/${encodeURIComponent(username)}?user.fields=${encodeURIComponent(fields)}`, {
+    headers: { Authorization: `Bearer ${required('X_BEARER_TOKEN')}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(10000)
+  });
+  const payload = await xResponse.json().catch(() => ({}));
+  if (xResponse.status === 404 || (!payload.data && payload.errors?.length)) {
+    const error = new Error('That X account does not exist.'); error.status = 404; throw error;
+  }
+  if (xResponse.status === 429) {
+    const error = new Error('X lookup limit reached. Try again shortly.'); error.status = 429; throw error;
+  }
+  if (!xResponse.ok || !payload.data) {
+    const error = new Error('X could not verify this account right now.'); error.status = 502; throw error;
+  }
+  const user = payload.data;
+  return {
+    xUserId: user.id, handle: `@${user.username}`, name: user.name,
+    bio: user.description || null, location: user.location || null, website: user.url || null,
+    avatarUrl: user.profile_image_url?.replace('_normal.', '_400x400.') || null,
+    followers: user.public_metrics?.followers_count ?? null,
+    following: user.public_metrics?.following_count ?? null,
+    tweets: user.public_metrics?.tweet_count ?? null,
+    listed: user.public_metrics?.listed_count ?? null,
+    verified: Boolean(user.verified), protected: Boolean(user.protected),
+    accountCreatedAt: user.created_at || null
+  };
+}
+
 app.post('/api/webhooks/dodo', express.raw({ type: 'application/json' }), async (request, response) => {
   try {
     const secret = required('DODO_WEBHOOK_SECRET');
@@ -59,6 +91,11 @@ app.post('/api/webhooks/dodo', express.raw({ type: 'application/json' }), async 
 
 app.use(express.json({ limit: '100kb' }));
 
+app.get('/api/x-profile', async (request, response) => {
+  try { response.json(await fetchXProfile(request.query.handle)); }
+  catch (error) { response.status(error.status || 500).json({ error: error.message || 'Profile verification failed.' }); }
+});
+
 app.get('/api/leaderboard', async (_request, response) => {
   try {
     const { supabase } = services();
@@ -70,8 +107,7 @@ app.get('/api/leaderboard', async (_request, response) => {
       engagement: row.engagement_rate == null ? null : `${row.engagement_rate}%`,
       bid: row.amount_cents / 100, avatarUrl: row.avatar_url
     }));
-    const leadingCents = Number(data?.[0]?.amount_cents) || 0;
-    response.json({ marketers, minimumBid: (leadingCents ? leadingCents + 100 : Number(process.env.MINIMUM_BID_CENTS || 100)) / 100 });
+    response.json({ marketers, minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100 });
   } catch (error) {
     console.error('Leaderboard error:', error.message);
     response.status(503).json({ error: 'Leaderboard is temporarily unavailable.' });
@@ -82,14 +118,20 @@ app.post('/api/checkout', async (request, response) => {
   let bidId;
   try {
     const { supabase, dodo } = services();
-    const handle = normalizeHandle(request.body.handle);
+    const xProfile = await fetchXProfile(request.body.handle);
+    const handle = xProfile.handle;
     const amountCents = Math.round(Number(request.body.amount) * 100);
     const minimumCents = Number(process.env.MINIMUM_BID_CENTS || 100);
-    const { data: leader } = await supabase.from('bids').select('amount_cents').eq('status', 'paid').order('amount_cents', { ascending: false }).limit(1).maybeSingle();
-    const requiredCents = leader?.amount_cents ? Number(leader.amount_cents) + 100 : minimumCents;
+    const requiredCents = minimumCents;
     if (!Number.isSafeInteger(amountCents) || amountCents < requiredCents) return response.status(400).json({ error: `Minimum bid is $${(requiredCents / 100).toLocaleString()}.` });
 
-    const { data: marketer, error: marketerError } = await supabase.from('marketers').upsert({ handle }, { onConflict: 'handle' }).select('id').single();
+    const { data: marketer, error: marketerError } = await supabase.from('marketers').upsert({
+      handle, x_user_id: xProfile.xUserId, name: xProfile.name, bio: xProfile.bio,
+      location: xProfile.location, website: xProfile.website, avatar_url: xProfile.avatarUrl,
+      followers: xProfile.followers, x_verified: xProfile.verified, x_protected: xProfile.protected,
+      following_count: xProfile.following, tweet_count: xProfile.tweets, listed_count: xProfile.listed,
+      account_created_at: xProfile.accountCreatedAt, x_profile_synced_at: new Date().toISOString()
+    }, { onConflict: 'handle' }).select('id').single();
     if (marketerError) throw marketerError;
     bidId = crypto.randomUUID();
     const { error: bidError } = await supabase.from('bids').insert({ id: bidId, marketer_id: marketer.id, amount_cents: amountCents });

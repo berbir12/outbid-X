@@ -22,3 +22,4 @@
   height: 34px;
   box-shadow: none;
 }
+.profile-preview{display:flex;align-items:center;gap:11px;margin-top:10px;padding:11px;border:1px solid var(--line);border-radius:11px;background:#fafaff;text-align:left}.profile-preview[hidden]{display:none}.profile-preview img{width:42px;height:42px;border-radius:50%;object-fit:cover}.profile-preview div{min-width:0}.profile-preview strong{display:block;font-size:12px}.profile-preview span{display:block;margin-top:3px;color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.profile-preview b{margin-left:auto;padding:5px 7px;border-radius:6px;background:#e5faaf;color:#4b6707;font-size:9px}.handle-field.invalid{border-color:#e34d59;background:#fff7f7}.handle-error{margin:7px 2px 0!important;color:#d14350!important;text-align:left!important}.submit-bid:disabled{cursor:wait;opacity:.7}
