@@ -1,0 +1,24 @@
+.empty-board {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+.empty-board::before {
+  content: "OX";
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 7px;
+  border-radius: 14px;
+  background: var(--soft);
+  color: var(--violet);
+  font-size: 12px;
+  font-weight: 800;
+}
+.empty-board strong { font-size: 16px; }
+.empty-board span { color: var(--muted); font-size: 12px; }

@@ -1,0 +1,15 @@
+# Environment secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies and deployment output
+node_modules/
+.vercel/
+.netlify/
+dist/
+
+# Local files
+*.log
+.DS_Store
+Thumbs.db
