@@ -248,16 +248,17 @@ app.get('/api/x-profile', async (request, response) => {
 
 const activeSessions = new Map();
 const clicksMap = new Map();
-let totalPageViews = 1240;
+let totalPageViews = 0;
 
 function getStats() {
   const now = Date.now();
   for (const [id, time] of activeSessions.entries()) {
-    if (now - time > 180000) activeSessions.delete(id);
+    if (now - time > 120000) activeSessions.delete(id);
   }
-  const baseActive = 14 + Math.floor((Math.sin(now / 60000) + 1) * 4);
-  const online = Math.max(activeSessions.size, baseActive);
-  return { online, totalViews: totalPageViews };
+  return {
+    online: activeSessions.size,
+    totalViews: totalPageViews
+  };
 }
 
 function recordPresence(sessionId) {
