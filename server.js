@@ -255,28 +255,45 @@ app.get('/api/x-profile', async (request, response) => {
 
 const activeSessions = new Map();
 const clicksMap = new Map();
-let dataFastRealtimeCache = { visitors: null, expiresAt: 0 };
+let dataFastStatsCache = { value: null, expiresAt: 0 };
 
-async function getDataFastOnlineCount() {
+async function fetchDataFast(pathname, params = {}) {
   const apiKey = process.env.DATAFAST_API_KEY;
   if (!apiKey) return null;
-  if (Date.now() < dataFastRealtimeCache.expiresAt) return dataFastRealtimeCache.visitors;
-
-  const query = new URLSearchParams({ fields: 'visitors' });
+  const query = new URLSearchParams(params);
   if (apiKey.startsWith('dft_')) {
     if (!process.env.DATAFAST_WEBSITE_ID) throw new Error('DATAFAST_WEBSITE_ID is required with a dft_ account token');
     query.set('websiteId', process.env.DATAFAST_WEBSITE_ID);
   }
-  const dataFastResponse = await fetch(`https://datafa.st/api/v1/analytics/realtime?${query}`, {
+  const dataFastResponse = await fetch(`https://datafa.st/api/v1/analytics/${pathname}?${query}`, {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(5000)
   });
-  if (!dataFastResponse.ok) throw new Error(`DataFast realtime API returned ${dataFastResponse.status}`);
-  const payload = await dataFastResponse.json();
-  const visitors = Number(payload.data?.[0]?.visitors);
-  if (!Number.isFinite(visitors)) throw new Error('DataFast realtime API returned an invalid visitor count');
-  dataFastRealtimeCache = { visitors, expiresAt: Date.now() + 15000 };
-  return visitors;
+  if (!dataFastResponse.ok) throw new Error(`DataFast ${pathname} API returned ${dataFastResponse.status}`);
+  return dataFastResponse.json();
+}
+
+async function getDataFastStats() {
+  if (!process.env.DATAFAST_API_KEY) return null;
+  if (Date.now() < dataFastStatsCache.expiresAt) return dataFastStatsCache.value;
+  const [overviewPayload, realtimePayload] = await Promise.all([
+    fetchDataFast('overview', { fields: 'visitors,pageviews,sessions' }),
+    fetchDataFast('realtime', { fields: 'visitors' })
+  ]);
+  const overview = overviewPayload?.data?.[0] || {};
+  const realtime = realtimePayload?.data?.[0] || {};
+  const value = {
+    pageviews: Number(overview.pageviews) || 0,
+    visitors: Number(overview.visitors) || 0,
+    sessions: Number(overview.sessions) || 0,
+    online: Number(realtime.visitors) || 0
+  };
+  dataFastStatsCache = { value, expiresAt: Date.now() + 30000 };
+  return value;
+}
+
+async function getDataFastOnlineCount() {
+  return (await getDataFastStats())?.online ?? null;
 }
 
 function getOnlineCount() {
@@ -294,6 +311,18 @@ app.post('/api/heartbeat', async (request, response) => {
   try { online = (await getDataFastOnlineCount()) ?? online; }
   catch (error) { console.warn('DataFast realtime fallback:', error.message); }
   response.json({ online });
+});
+
+app.get('/api/analytics', async (request, response) => {
+  try {
+    const stats = await getDataFastStats();
+    if (!stats) return response.status(503).json({ error: 'DataFast analytics is not configured.' });
+    response.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+    response.json(stats);
+  } catch (error) {
+    console.error('DataFast analytics error:', error.message);
+    response.status(502).json({ error: 'DataFast analytics is temporarily unavailable.' });
+  }
 });
 
 app.post('/api/track-click', async (request, response) => {

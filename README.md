@@ -15,7 +15,7 @@
 
 ## DataFast analytics
 
-The official `datafast` SDK records page views for website `dfid_1z9kdsJAlIyP9h5JcvBPk`. Configure `DATAFAST_API_KEY` for the server-side realtime online visitor count. A website API key beginning with `df_` needs no other setting. For a `dft_` account token with `analytics:read` access, also configure `DATAFAST_WEBSITE_ID` with DataFast's internal website ID.
+The official asynchronous DataFast tracker records page views for website `dfid_1z9kdsJAlIyP9h5JcvBPk`. Configure `DATAFAST_API_KEY` to show all-time pageviews, visitors, sessions, and the realtime visitor count on the site. A website API key beginning with `df_` needs no other setting. For a `dft_` account token with `analytics:read` access, also configure `DATAFAST_WEBSITE_ID` with DataFast's internal website ID.
 
 ## X profile verification
 

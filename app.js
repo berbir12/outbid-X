@@ -16,6 +16,21 @@ const dialog = document.querySelector('#checkoutDialog');
 const handleInput = document.querySelector('#handleInput');
 const money = value => `$${Number(value).toLocaleString()}`;
 const initials = name => (name || 'X').split(' ').map(part => part[0]).join('').slice(0, 2);
+const compactNumber = value => Number(value || 0).toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 1 });
+
+async function loadAnalytics() {
+  try {
+    const response = await fetch('/api/analytics', { cache: 'no-store', headers: { Accept: 'application/json' } });
+    if (!response.ok) return;
+    const stats = await response.json();
+    const pageviews = document.querySelector('#pageviewCount');
+    const visitors = document.querySelector('#visitorCount');
+    const online = document.querySelector('#onlineCount');
+    if (pageviews) { pageviews.textContent = compactNumber(stats.pageviews); pageviews.title = Number(stats.pageviews || 0).toLocaleString(); }
+    if (visitors) { visitors.textContent = compactNumber(stats.visitors); visitors.title = Number(stats.visitors || 0).toLocaleString(); }
+    if (online) online.textContent = Number(stats.online || 0).toLocaleString();
+  } catch {}
+}
 
 function formatTimeAgo(dateInput) {
   if (!dateInput) return 'recently';
@@ -297,6 +312,7 @@ document.querySelector('#dodoCheckout').addEventListener('click', async () => {
 
 render();
 loadLeaderboard();
+loadAnalytics();
 handlePaymentRedirect();
 
 // Send heartbeat every 45 seconds to keep live visitor presence active
@@ -314,6 +330,8 @@ setInterval(async () => {
     }
   } catch {}
 }, 45000);
+
+setInterval(loadAnalytics, 60000);
 
 // Re-render every 30 seconds to update relative bid times
 setInterval(() => {
