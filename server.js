@@ -17,9 +17,11 @@ function required(name) {
   return value;
 }
 
-function services() {
+function services(includePayments = false) {
   const supabase = createClient(required('SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false, autoRefreshToken: false } });
-  const dodo = new DodoPayments({ bearerToken: required('DODO_PAYMENTS_API_KEY'), environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode' ? 'live_mode' : 'test_mode' });
+  const dodo = includePayments
+    ? new DodoPayments({ bearerToken: required('DODO_PAYMENTS_API_KEY'), environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode' ? 'live_mode' : 'test_mode' })
+    : null;
   return { supabase, dodo };
 }
 
@@ -196,7 +198,7 @@ app.get('/api/verify-payment', async (request, response) => {
     const checkoutSessionId = request.query.checkout_session_id || request.query.session_id;
     const bidId = request.query.bid_id;
 
-    const { supabase, dodo } = services();
+    const { supabase, dodo } = services(true);
 
     // If payment_id is provided, verify directly with Dodo Payments API
     if (paymentId) {
@@ -390,7 +392,7 @@ app.get('/api/leaderboard', async (request, response) => {
 app.post('/api/checkout', async (request, response) => {
   let bidId;
   try {
-    const { supabase, dodo } = services();
+    const { supabase, dodo } = services(true);
     const xProfile = await fetchXProfile(request.body.handle);
     const handle = xProfile.handle;
     const amountCents = Math.round(Number(request.body.amount) * 100);

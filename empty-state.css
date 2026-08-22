@@ -40,3 +40,6 @@
   color: inherit;
   text-decoration: underline;
 }
+.payment-toast[hidden] {
+  display: none;
+}

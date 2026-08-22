@@ -148,8 +148,11 @@ async function loadLeaderboard() {
   board.classList.add('refreshing');
   try {
     const response = await fetch(`/api/leaderboard?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store', headers: { Accept: 'application/json' } });
-    updateMarket(response.ok ? await response.json() : {});
-  } catch { updateMarket(); }
+    if (!response.ok) throw new Error('Directory unavailable');
+    updateMarket(await response.json());
+  } catch {
+    board.innerHTML = '<div class="empty-board"><strong>Directory temporarily unavailable</strong><span>Refresh in a moment to try again.</span></div>';
+  }
   finally { setTimeout(() => board.classList.remove('refreshing'), 300); }
 }
 
