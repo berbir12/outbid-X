@@ -96,7 +96,7 @@ function render() {
       ? `<div class="amount">${money(marketer.bid)}</div><div class="bid-time" title="${marketer.paidAt ? new Date(marketer.paidAt).toLocaleString() : ''}">Sponsored · ${timeAgo}</div>`
       : '<div class="organic-label">Daily discovery</div><div class="bid-time">Rotates daily</div>';
 
-    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" onclick="trackMarketerClick('${marketer.handle}', ${index})" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
+    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" data-handle="${marketer.handle}" data-index="${index}" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
       <div class="rank-wrap">
         <div class="rank">#${index + 1}${marketer.sponsored ? '<small>SPONSORED</small>' : ''}</div>
         <div class="identity">
@@ -118,6 +118,12 @@ function render() {
     </a>`;
   }).join('');
 }
+
+board.addEventListener('click', event => {
+  const card = event.target.closest('a.card');
+  if (!card || !board.contains(card)) return;
+  trackMarketerClick(card.dataset.handle, Number(card.dataset.index));
+});
 
 function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
