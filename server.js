@@ -321,7 +321,10 @@ app.get('/api/analytics', async (request, response) => {
     response.json(stats);
   } catch (error) {
     console.error('DataFast analytics error:', error.message);
-    response.status(502).json({ error: 'DataFast analytics is temporarily unavailable.' });
+    response.status(502).json({
+      error: 'DataFast analytics is temporarily unavailable.',
+      diagnostic: error.message
+    });
   }
 });
 
