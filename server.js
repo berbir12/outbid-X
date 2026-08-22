@@ -7,7 +7,6 @@ import DodoPayments from 'dodopayments';
 import { Webhook } from 'standardwebhooks';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const dataFastSdkPath = fileURLToPath(import.meta.resolve('datafast'));
 const app = express();
 const port = Number(process.env.PORT) || 4173;
 
@@ -287,11 +286,6 @@ function getOnlineCount() {
   }
   return activeSessions.size;
 }
-
-app.get('/api/datafast-sdk', (request, response) => {
-  response.set('Cache-Control', 'public, max-age=31536000, immutable');
-  response.type('text/javascript').sendFile(dataFastSdkPath);
-});
 
 app.post('/api/heartbeat', async (request, response) => {
   const sessionId = request.body?.sessionId || request.headers['x-session-id'] || request.ip;

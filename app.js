@@ -1,14 +1,3 @@
-import { initDataFast } from 'datafast';
-
-try {
-  await initDataFast({
-    websiteId: 'dfid_1z9kdsJAlIyP9h5JcvBPk',
-    autoCapturePageviews: true
-  });
-} catch (error) {
-  console.warn('DataFast analytics could not start:', error);
-}
-
 let marketers = [];
 let bid = 1;
 let minimumBid = 1;
