@@ -1,3 +1,14 @@
+import { initDataFast } from 'datafast';
+
+try {
+  await initDataFast({
+    websiteId: 'dfid_1z9kdsJAlIyP9h5JcvBPk',
+    autoCapturePageviews: true
+  });
+} catch (error) {
+  console.warn('DataFast analytics could not start:', error);
+}
+
 let marketers = [];
 let bid = 1;
 let minimumBid = 1;
@@ -77,10 +88,13 @@ function render() {
     const profileUrl = `https://x.com/${encodeURIComponent(handleClean)}`;
     const clicksCount = Number(marketer.clicks || 0);
     const timeAgo = formatTimeAgo(marketer.paidAt);
+    const placement = marketer.sponsored
+      ? `<div class="amount">${money(marketer.bid)}</div><div class="bid-time" title="${marketer.paidAt ? new Date(marketer.paidAt).toLocaleString() : ''}">Sponsored · ${timeAgo}</div>`
+      : '<div class="organic-label">Daily discovery</div><div class="bid-time">Rotates daily</div>';
 
     return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" onclick="trackMarketerClick('${marketer.handle}', ${index})" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
       <div class="rank-wrap">
-        <div class="rank">#${index + 1}</div>
+        <div class="rank">#${index + 1}${marketer.sponsored ? '<small>SPONSORED</small>' : ''}</div>
         <div class="identity">
           <div class="avatar" style="--avatar:${marketer.color || '#6558f5'}">
             ${marketer.avatarUrl ? `<img src="${marketer.avatarUrl}" alt="${marketer.name}" onerror="this.remove()" />` : initials(marketer.name)}
@@ -96,17 +110,15 @@ function render() {
         <strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers
         <span class="clicks-stat" id="clicks-${index}">${clicksCount.toLocaleString()} clicks</span>
       </div>
-      <div class="amount-wrap">
-        <div class="amount">${money(marketer.bid)}</div>
-        <div class="bid-time" title="${marketer.paidAt ? new Date(marketer.paidAt).toLocaleString() : ''}">⚡ ${timeAgo}</div>
-      </div>
+      <div class="amount-wrap">${placement}</div>
     </a>`;
   }).join('');
 }
 
 function updateMarket(data = {}) {
   marketers = Array.isArray(data.marketers) ? data.marketers : [];
-  const leading = Number(marketers[0]?.bid) || 0;
+  const sponsored = marketers.filter(marketer => marketer.sponsored);
+  const leading = Number(sponsored[0]?.bid) || 0;
   minimumBid = Number(data.minimumBid) || 1;
   if (bidInput) bidInput.min = minimumBid;
 
@@ -122,10 +134,10 @@ function updateMarket(data = {}) {
     const onlineEl = document.querySelector('#onlineCount');
     const competingEl = document.querySelector('#competingCount');
     if (onlineEl) onlineEl.textContent = data.stats.online;
-    if (competingEl) competingEl.textContent = `${marketers.length} competing`;
+    if (competingEl) competingEl.textContent = `${data.stats.competing || 0} competing`;
   } else {
     const competingEl = document.querySelector('#competingCount');
-    if (competingEl) competingEl.textContent = `${marketers.length} competing`;
+    if (competingEl) competingEl.textContent = `${sponsored.length} competing`;
   }
 
   document.querySelector('#leadingBid').textContent = leading ? `Current #1 is ${money(leading)}` : 'No bids yet';
@@ -203,7 +215,7 @@ function updateBid(change) {
     setBid(bid + change, true);
   }
 }
-function estimatedRank(value) { const index = marketers.findIndex(marketer => value > marketer.bid); return index === -1 ? marketers.length + 1 : index + 1; }
+function estimatedRank(value) { const sponsored = marketers.filter(marketer => marketer.sponsored); const index = sponsored.findIndex(marketer => value > marketer.bid); return index === -1 ? sponsored.length + 1 : index + 1; }
 function openCheckout() {
   const handle = handleInput.value.trim();
   if (!handle) { handleInput.focus(); return; }

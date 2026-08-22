@@ -14,14 +14,13 @@
   <link rel="stylesheet" href="empty-state.css" />
   <link rel="stylesheet" href="logo.css" />
   <link rel="stylesheet" href="viewport.css" />
-  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
   <header class="topbar shell">
     <a class="logo" href="#" aria-label="Top Marketers home"><span class="logo-mark"><img src="assets/outbid-x-logo.png" alt="" /></span><span class="logo-type">Top <b>Marketers</b></span></a>
     <div class="top-status">
       <span class="live-badge"><i></i> <b id="onlineCount">1</b> online</span>
-      <span class="views-stat">Views tracked by Vercel</span>
+      <span class="views-stat">Views tracked by DataFast</span>
       <strong id="competingCount">0 competing</strong>
     </div>
     <button class="header-action" id="headerBid">Place a bid <span>↗</span></button>
@@ -51,12 +50,12 @@
     <section class="leaderboard-section">
       <div id="paymentNotification" class="payment-toast" hidden></div>
       <div class="leaderboard-head">
-        <div><p>MARKET LEADERBOARD</p><h2>Top marketers on X</h2></div>
+        <div><p>SPONSORED LEADERBOARD + DAILY DISCOVERY</p><h2>Marketers worth following on X</h2></div>
         <div class="board-actions"><span><i></i> Updated now</span><button id="refreshButton">↻ Refresh</button></div>
       </div>
-      <div class="column-head"><span>Rank & marketer</span><span>Audience & Clicks</span><span>Bid & time</span></div>
+      <div class="column-head"><span>Position & marketer</span><span>Audience & Clicks</span><span>Placement</span></div>
       <div class="board" id="leaderboard"><div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div></div>
-      <p class="sponsored-note">Sponsored visibility ranking · Ordered by verified one-time bid · Audience metrics are self-reported</p>
+      <p class="sponsored-note">Sponsored profiles are ordered by verified bids. Other profiles rotate daily. Public profile data comes from X; discovery list inspired by <a href="https://foundationinc.co/lab/marketers-to-follow" target="_blank" rel="noopener noreferrer">Foundation</a>. No affiliation or endorsement is implied.</p>
     </section>
   </main>
 
@@ -77,6 +76,9 @@
   </dialog>
 
   <footer class="shell"><a class="logo mini" href="#"><span class="logo-mark"><img src="assets/outbid-x-logo.png" alt="" /></span><span class="logo-type">Top <b>Marketers</b></span></a><p>Visibility for marketers who mean business.</p><span>© 2026 Top Marketers</span></footer>
-  <script src="app.js?v=6"></script>
+  <script type="importmap">
+    { "imports": { "datafast": "/api/datafast-sdk" } }
+  </script>
+  <script type="module" src="app.js?v=7"></script>
 </body>
 </html>

@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "node --env-file=.env.local server.js",
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js"
+    "check": "node --check server.js && node --check app.js && node --check scripts/import-foundation-marketers.js",
+    "import:marketers": "node --env-file=.env.local scripts/import-foundation-marketers.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "datafast": "^3.0.18",
     "dodopayments": "^1.40.0",
-    "express": "^5.1.0"
-    ,"standardwebhooks": "^1.0.0"
+    "express": "^5.1.0",
+    "standardwebhooks": "^1.0.0"
   }
 }

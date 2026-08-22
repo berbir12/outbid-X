@@ -13,9 +13,21 @@
 5. Put the webhook signing secret in `DODO_WEBHOOK_SECRET`.
 6. Run `npm run dev`.
 
+## DataFast analytics
+
+The official `datafast` SDK records page views for website `dfid_1z9kdsJAlIyP9h5JcvBPk`. Configure `DATAFAST_API_KEY` for the server-side realtime online visitor count. A website API key beginning with `df_` needs no other setting. For a `dft_` account token with `analytics:read` access, also configure `DATAFAST_WEBSITE_ID` with DataFast's internal website ID.
+
 ## X profile verification
 
 Create an app in the X Developer Console, copy its app-only Bearer Token, and set `X_BEARER_TOKEN` in `.env.local`. Outbid X uses the official `GET /2/users/by/username/:username` endpoint to validate the account and fetch its public profile fields before checkout. The token remains server-side.
+
+To refresh the discovery directory from Foundation's public marketers-to-follow list and current X profile data, run:
+
+```sh
+npm run import:marketers
+```
+
+Sponsored profiles are ranked by verified paid bids. All other imported profiles are shuffled deterministically once per UTC day.
 
 ## Data and payment flow
 

@@ -22,3 +22,21 @@
 }
 .empty-board strong { font-size: 16px; }
 .empty-board span { color: var(--muted); font-size: 12px; }
+.rank small {
+  display: block;
+  margin-top: 4px;
+  color: #6558f5;
+  font-size: 8px;
+  letter-spacing: .08em;
+}
+
+.organic-label {
+  color: #6558f5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sponsored-note a {
+  color: inherit;
+  text-decoration: underline;
+}

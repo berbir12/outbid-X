@@ -7,6 +7,7 @@ import DodoPayments from 'dodopayments';
 import { Webhook } from 'standardwebhooks';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const dataFastSdkPath = fileURLToPath(import.meta.resolve('datafast'));
 const app = express();
 const port = Number(process.env.PORT) || 4173;
 
@@ -27,6 +28,11 @@ function normalizeHandle(input) {
   const handle = `@${value.replace(/^@/, '')}`;
   if (!/^@[A-Za-z0-9_]{1,15}$/.test(handle)) throw new Error('Enter a valid X handle.');
   return handle;
+}
+
+function dailyScore(handle) {
+  const day = new Date().toISOString().slice(0, 10);
+  return crypto.createHash('sha256').update(`${day}:${String(handle).toLowerCase()}`).digest('hex');
 }
 
 async function fetchXProfile(input) {
@@ -248,6 +254,29 @@ app.get('/api/x-profile', async (request, response) => {
 
 const activeSessions = new Map();
 const clicksMap = new Map();
+let dataFastRealtimeCache = { visitors: null, expiresAt: 0 };
+
+async function getDataFastOnlineCount() {
+  const apiKey = process.env.DATAFAST_API_KEY;
+  if (!apiKey) return null;
+  if (Date.now() < dataFastRealtimeCache.expiresAt) return dataFastRealtimeCache.visitors;
+
+  const query = new URLSearchParams({ fields: 'visitors' });
+  if (apiKey.startsWith('dft_')) {
+    if (!process.env.DATAFAST_WEBSITE_ID) throw new Error('DATAFAST_WEBSITE_ID is required with a dft_ account token');
+    query.set('websiteId', process.env.DATAFAST_WEBSITE_ID);
+  }
+  const dataFastResponse = await fetch(`https://datafa.st/api/v1/analytics/realtime?${query}`, {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(5000)
+  });
+  if (!dataFastResponse.ok) throw new Error(`DataFast realtime API returned ${dataFastResponse.status}`);
+  const payload = await dataFastResponse.json();
+  const visitors = Number(payload.data?.[0]?.visitors);
+  if (!Number.isFinite(visitors)) throw new Error('DataFast realtime API returned an invalid visitor count');
+  dataFastRealtimeCache = { visitors, expiresAt: Date.now() + 15000 };
+  return visitors;
+}
 
 function getOnlineCount() {
   const now = Date.now();
@@ -257,10 +286,18 @@ function getOnlineCount() {
   return activeSessions.size;
 }
 
+app.get('/api/datafast-sdk', (request, response) => {
+  response.set('Cache-Control', 'public, max-age=31536000, immutable');
+  response.type('text/javascript').sendFile(dataFastSdkPath);
+});
+
 app.post('/api/heartbeat', async (request, response) => {
   const sessionId = request.body?.sessionId || request.headers['x-session-id'] || request.ip;
   activeSessions.set(sessionId, Date.now());
-  response.json({ online: getOnlineCount() });
+  let online = getOnlineCount();
+  try { online = (await getDataFastOnlineCount()) ?? online; }
+  catch (error) { console.warn('DataFast realtime fallback:', error.message); }
+  response.json({ online });
 });
 
 app.post('/api/track-click', async (request, response) => {
@@ -297,13 +334,17 @@ app.get('/api/leaderboard', async (request, response) => {
     const sessionId = request.query?.sessionId || request.headers['x-session-id'];
     const { supabase } = services();
 
-    // Record presence. Page views are tracked by Vercel Web Analytics in index.html.
+    // Record local presence as a fallback; page views and realtime visitors come from DataFast.
     if (sessionId) {
       activeSessions.set(sessionId, Date.now());
     }
-    const { data, error } = await supabase.from('leaderboard').select('*').order('amount_cents', { ascending: false }).order('paid_at', { ascending: true }).limit(100);
-    if (error) throw error;
-    const marketers = (data || []).map(row => ({
+    const [{ data: paidData, error: paidError }, { data: directoryData, error: directoryError }] = await Promise.all([
+      supabase.from('leaderboard').select('*').order('amount_cents', { ascending: false }).order('paid_at', { ascending: true }).limit(100),
+      supabase.from('marketers').select('handle,name,bio,category,followers,clicks,avatar_url').limit(500)
+    ]);
+    if (paidError) throw paidError;
+    if (directoryError) throw directoryError;
+    const sponsored = (paidData || []).map(row => ({
       name: row.name || row.handle.slice(1),
       handle: row.handle,
       title: row.title,
@@ -313,15 +354,31 @@ app.get('/api/leaderboard', async (request, response) => {
       paidAt: row.paid_at,
       engagement: row.engagement_rate == null ? null : `${row.engagement_rate}%`,
       bid: row.amount_cents / 100,
-      avatarUrl: row.avatar_url
+      avatarUrl: row.avatar_url,
+      sponsored: true
     }));
-    const stats = { online: getOnlineCount() };
+    const paidHandles = new Set(sponsored.map(marketer => marketer.handle.toLowerCase()));
+    const organic = (directoryData || [])
+      .filter(row => !paidHandles.has(row.handle.toLowerCase()))
+      .sort((a, b) => dailyScore(a.handle).localeCompare(dailyScore(b.handle)))
+      .map(row => ({
+        name: row.name || row.handle.slice(1), handle: row.handle, title: row.bio,
+        category: row.category, followers: row.followers,
+        clicks: (Number(row.clicks) || 0) + (clicksMap.get(row.handle) || 0),
+        paidAt: null, bid: null, avatarUrl: row.avatar_url, sponsored: false
+      }));
+    const marketers = [...sponsored, ...organic];
+    let online = getOnlineCount();
+    try { online = (await getDataFastOnlineCount()) ?? online; }
+    catch (dataFastError) { console.warn('DataFast realtime fallback:', dataFastError.message); }
+    const stats = { online };
     response.json({
       marketers,
       minimumBid: Number(process.env.MINIMUM_BID_CENTS || 100) / 100,
       stats: {
         ...stats,
-        competing: marketers.length
+        competing: sponsored.length,
+        directory: marketers.length
       }
     });
   } catch (error) {
