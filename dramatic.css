@@ -13,5 +13,22 @@ body{background:radial-gradient(circle at 72% 8%,rgba(8,127,245,.14),transparent
 @media(max-width:900px){.main-nav{display:none}.market-intro{grid-template-columns:1fr;gap:50px;min-height:auto}.intro-copy{text-align:center}.hero-live,.label,.trust-row{margin-inline:auto;justify-content:center}.intro-copy h1{font-size:clamp(52px,15vw,74px)}.bid-panel{transform:none}.bid-panel>*{transform:none}.leaderboard-head h2{font-size:38px}.card{grid-template-columns:1fr 110px}.column-head{display:none}}
 @media(max-width:520px){.topbar{display:flex;justify-content:space-between}.header-action{display:block;padding:11px 15px;font-size:12px}.market-intro{padding-top:45px;overflow:hidden}.hero-live{font-size:11px;max-width:100%}.hero-live span,.hero-live strong{padding:9px}.intro-copy{min-width:0}.intro-copy h1{font-size:46px;line-height:.96;letter-spacing:-.055em;max-width:100%;overflow-wrap:anywhere}.intro-copy>p{font-size:16px;max-width:100%}.trust-row{gap:8px}.leaderboard-section{padding-top:60px}.leaderboard-head h2{font-size:32px}.card{padding:15px 12px}.avatar{width:50px;height:50px;flex-basis:50px}.identity p{max-width:190px}.amount-wrap{min-width:92px}.organic-label{padding:9px 10px;font-size:10px}}
 @media(min-width:901px){.leaderboard-section{padding-top:38px}}
+@media(min-width:901px){
+  .market-intro{min-height:440px;padding:24px 0 30px;gap:60px}
+  .market-intro:before{width:250px;height:250px;border-width:48px;top:22px}
+  .hero-live{margin-top:18px}
+  .intro-copy h1{font-size:clamp(52px,5.2vw,72px);margin:16px 0 14px}
+  .intro-copy>p{font-size:16px;line-height:1.45}
+  .trust-row{margin-top:16px}
+  .bid-panel{padding:24px;border-radius:26px}
+  .bid-panel:before{border-radius:26px}
+  .panel-top{padding-bottom:14px;margin-bottom:14px}
+  .bid-panel>label{margin:12px 0 7px}
+  .handle-field{height:46px}
+  .amount-control{height:66px}
+  .amount-input-wrap .currency-prefix,.amount-input-wrap input{font-size:30px}
+  .submit-bid{height:52px}
+  .leaderboard-section{padding-top:12px}
+}
 @media(max-width:900px){.market-intro{padding:60px 0}}
 @media(max-width:520px){.market-intro{padding:45px 0 60px}}
