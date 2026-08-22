@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "node --env-file=.env.local server.js",
     "start": "node server.js",
-    "check": "node --check server.js && node --check app.js && node --check scripts/import-foundation-marketers.js",
-    "import:marketers": "node --env-file=.env.local scripts/import-foundation-marketers.js"
+    "check": "node --check server.js && node --check app.js && node --check scripts/import-foundation-marketers.js && node --check scripts/import-curated-marketers.js",
+    "import:marketers": "node --env-file=.env.local scripts/import-foundation-marketers.js",
+    "import:curated": "node --env-file=.env.local scripts/import-curated-marketers.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

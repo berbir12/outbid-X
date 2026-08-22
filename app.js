@@ -2,6 +2,7 @@ let marketers = [];
 let bid = 1;
 let minimumBid = 1;
 let userHasCustomizedBid = false;
+let activeFilter = 'all';
 
 // Unique visitor session identifier for live presence
 let sessionId = sessionStorage.getItem('tm_session_id');
@@ -26,9 +27,13 @@ async function loadAnalytics() {
     const pageviews = document.querySelector('#pageviewCount');
     const visitors = document.querySelector('#visitorCount');
     const online = document.querySelector('#onlineCount');
+    const heroOnline = document.querySelector('#heroOnlineCount');
+    const heroPageviews = document.querySelector('#heroPageviewCount');
     if (pageviews) { pageviews.textContent = compactNumber(stats.pageviews); pageviews.title = Number(stats.pageviews || 0).toLocaleString(); }
     if (visitors) { visitors.textContent = compactNumber(stats.visitors); visitors.title = Number(stats.visitors || 0).toLocaleString(); }
     if (online) online.textContent = Number(stats.online || 0).toLocaleString();
+    if (heroOnline) heroOnline.textContent = Number(stats.online || 0).toLocaleString();
+    if (heroPageviews) heroPageviews.textContent = compactNumber(stats.pageviews);
   } catch {}
 }
 
@@ -87,16 +92,25 @@ function render() {
     board.innerHTML = '<div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div>';
     return;
   }
-  board.innerHTML = marketers.map((marketer, index) => {
+  const visibleMarketers = activeFilter === 'all' ? marketers : marketers.filter(marketer => {
+    const searchable = `${marketer.category || ''} ${marketer.title || ''}`.toLowerCase();
+    return searchable.includes(activeFilter);
+  });
+  if (!visibleMarketers.length) {
+    board.innerHTML = '<div class="empty-board"><strong>No experts in this category yet</strong><span>Try another category.</span></div>';
+    return;
+  }
+  board.innerHTML = visibleMarketers.map((marketer, index) => {
+    const marketerIndex = marketers.indexOf(marketer);
     const handleClean = (marketer.handle || '').replace(/^@/, '');
     const profileUrl = `https://x.com/${encodeURIComponent(handleClean)}`;
     const clicksCount = Number(marketer.clicks || 0);
     const timeAgo = formatTimeAgo(marketer.paidAt);
     const placement = marketer.sponsored
       ? `<div class="amount">${money(marketer.bid)}</div><div class="bid-time" title="${marketer.paidAt ? new Date(marketer.paidAt).toLocaleString() : ''}">Sponsored · ${timeAgo}</div>`
-      : '<div class="organic-label">Daily discovery</div><div class="bid-time">Rotates daily</div>';
+      : '<div class="organic-label">View profile ↗</div><div class="bid-time">Daily discovery</div>';
 
-    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" data-handle="${marketer.handle}" data-index="${index}" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
+    return `<a href="${profileUrl}" target="_blank" rel="noopener noreferrer" class="card" data-handle="${marketer.handle}" data-index="${marketerIndex}" aria-label="Visit ${marketer.name}'s X profile (${marketer.handle})">
       <div class="rank-wrap">
         <div class="rank">#${index + 1}${marketer.sponsored ? '<small>SPONSORED</small>' : ''}</div>
         <div class="identity">
@@ -112,7 +126,7 @@ function render() {
       </div>
       <div class="metrics">
         <strong>${marketer.followers != null ? Number(marketer.followers).toLocaleString() : '—'}</strong> followers
-        <span class="clicks-stat" id="clicks-${index}">${clicksCount.toLocaleString()} clicks</span>
+        <span class="clicks-stat" id="clicks-${marketerIndex}">${clicksCount.toLocaleString()} clicks</span>
       </div>
       <div class="amount-wrap">${placement}</div>
     </a>`;
@@ -123,6 +137,14 @@ board.addEventListener('click', event => {
   const card = event.target.closest('a.card');
   if (!card || !board.contains(card)) return;
   trackMarketerClick(card.dataset.handle, Number(card.dataset.index));
+});
+
+document.querySelector('.category-filters')?.addEventListener('click', event => {
+  const button = event.target.closest('button[data-filter]');
+  if (!button) return;
+  activeFilter = button.dataset.filter;
+  document.querySelectorAll('.category-filters button').forEach(item => item.classList.toggle('active', item === button));
+  render();
 });
 
 function updateMarket(data = {}) {

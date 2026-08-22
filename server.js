@@ -5,6 +5,7 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import DodoPayments from 'dodopayments';
 import { Webhook } from 'standardwebhooks';
+import { CURATED_HANDLE_SET } from './data/curated-marketers.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -403,7 +404,7 @@ app.get('/api/leaderboard', async (request, response) => {
     }));
     const paidHandles = new Set(sponsored.map(marketer => marketer.handle.toLowerCase()));
     const organic = (directoryData || [])
-      .filter(row => !paidHandles.has(row.handle.toLowerCase()))
+      .filter(row => CURATED_HANDLE_SET.has(row.handle.toLowerCase()) && !paidHandles.has(row.handle.toLowerCase()))
       .sort((a, b) => dailyScore(a.handle).localeCompare(dailyScore(b.handle)))
       .map(row => ({
         name: row.name || row.handle.slice(1), handle: row.handle, title: row.bio,

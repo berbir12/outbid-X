@@ -14,11 +14,13 @@
   <link rel="stylesheet" href="empty-state.css" />
   <link rel="stylesheet" href="logo.css" />
   <link rel="stylesheet" href="viewport.css" />
+  <link rel="stylesheet" href="dramatic.css" />
   <script defer data-website-id="dfid_1z9kdsJAlIyP9h5JcvBPk" data-domain="topmarketers.lol" src="https://datafa.st/js/script.js"></script>
 </head>
 <body>
   <header class="topbar shell">
     <a class="logo" href="#" aria-label="Top Marketers home"><span class="logo-mark"><img src="assets/outbid-x-logo.png" alt="" /></span><span class="logo-type">Top <b>Marketers</b></span></a>
+    <nav class="main-nav"><a href="#leaderboard">Discover</a><a href="#how-it-works">How it works</a><a href="#quickBidForm">Get featured</a></nav>
     <div class="top-status">
       <span class="live-badge"><i></i> <b id="onlineCount">1</b> online</span>
       <span class="views-stat"><b id="pageviewCount">—</b> views · <b id="visitorCount">—</b> visitors</span>
@@ -30,33 +32,35 @@
   <main class="shell">
     <section class="market-intro">
       <div class="intro-copy">
-        <div class="label"><span>TOP MARKETERS MARKET</span><b>LIVE</b></div>
-        <h1>Get seen by the<br />people who <em>hire.</em></h1>
-        <p>Marketers and creators bid for visibility. Brands discover proven talent. Every position is transparent.</p>
-        <div class="trust-row"><span>One-time bids</span><span>Instant ranking</span><span>Powered by Dodo</span></div>
+        <div class="label"><span>THE LIVE MARKETING POWER LIST</span><b>UPDATED DAILY</b></div>
+        <div class="hero-live"><span><i></i> <b id="heroOnlineCount">1</b> online now</span><strong><b id="heroPageviewCount">—</b> views so far</strong></div>
+        <h1>Own the <em>#1</em> spot<br />in marketing.</h1>
+        <p>Discover the sharpest minds in Reddit, SEO, growth and content—or outbid them and put your profile at the top.</p>
+        <div class="trust-row"><span>Real X profiles</span><span>Public click counts</span><span>Transparent bids</span></div>
       </div>
 
       <form class="bid-panel" id="quickBidForm">
-        <div class="panel-top"><span>YOUR BID</span><small id="leadingBid">No bids yet</small></div>
+        <div class="panel-top"><span>CLAIM YOUR POSITION</span><small id="leadingBid">No bids yet</small></div>
         <label for="handleInput">X handle or profile URL</label>
         <div class="handle-field"><span>𝕏</span><input id="handleInput" placeholder="@yourhandle" required /></div>
         <div class="profile-preview" id="profilePreview" hidden></div>
         <label for="bidInput">Bid amount</label>
         <div class="amount-control"><button type="button" id="minusBid" aria-label="Decrease bid">−</button><div class="amount-input-wrap"><span class="currency-prefix">$</span><input type="number" id="bidInput" min="1" step="1" value="1" aria-label="Bid amount in USD" /></div><button type="button" id="plusBid" aria-label="Increase bid">+</button></div>
         <p>Your amount determines the highest available position.</p>
-        <button class="submit-bid" type="submit">Continue to bid <span>→</span></button>
+        <button class="submit-bid" type="submit">Take the top spot <span>→</span></button>
       </form>
     </section>
 
     <section class="leaderboard-section">
       <div id="paymentNotification" class="payment-toast" hidden></div>
       <div class="leaderboard-head">
-        <div><p>SPONSORED LEADERBOARD + DAILY DISCOVERY</p><h2>Marketers worth following on X</h2></div>
+        <div><p>THE PEOPLE SHAPING MODERN MARKETING</p><h2>Find your next unfair advantage.</h2></div>
         <div class="board-actions"><span><i></i> Updated now</span><button id="refreshButton">↻ Refresh</button></div>
       </div>
+      <div class="category-filters" aria-label="Filter marketers"><button class="active" data-filter="all">All experts</button><button data-filter="reddit">Reddit</button><button data-filter="seo">SEO</button><button data-filter="search">AI Search</button><button data-filter="growth">Growth</button><button data-filter="content">Content</button></div>
       <div class="column-head"><span>Position & marketer</span><span>Audience & Clicks</span><span>Placement</span></div>
       <div class="board" id="leaderboard"><div class="empty-board"><strong>No bids yet</strong><span>Be the first marketer to claim the top position.</span></div></div>
-      <p class="sponsored-note">Sponsored profiles are ordered by verified bids. Other profiles rotate daily. Public profile data comes from X; discovery list inspired by <a href="https://foundationinc.co/lab/marketers-to-follow" target="_blank" rel="noopener noreferrer">Foundation</a>. No affiliation or endorsement is implied.</p>
+      <p class="sponsored-note" id="how-it-works">Sponsored profiles rank by verified bids. Curated experts rotate daily. Profile information is refreshed from X; no affiliation or endorsement is implied.</p>
     </section>
   </main>
 
