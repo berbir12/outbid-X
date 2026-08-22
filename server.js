@@ -256,14 +256,30 @@ app.get('/api/x-profile', async (request, response) => {
 const activeSessions = new Map();
 const clicksMap = new Map();
 let dataFastStatsCache = { value: null, expiresAt: 0 };
+let discoveredDataFastWebsiteId = null;
+
+async function getDataFastWebsiteId(apiKey) {
+  if (process.env.DATAFAST_WEBSITE_ID) return process.env.DATAFAST_WEBSITE_ID;
+  if (discoveredDataFastWebsiteId) return discoveredDataFastWebsiteId;
+  const websitesResponse = await fetch('https://datafa.st/api/v1/admin/websites', {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(5000)
+  });
+  if (!websitesResponse.ok) throw new Error(`DataFast website discovery returned ${websitesResponse.status}; configure DATAFAST_WEBSITE_ID.`);
+  const payload = await websitesResponse.json();
+  const websites = Array.isArray(payload.data) ? payload.data : payload.data?.websites || payload.websites || [];
+  const website = websites.find(item => String(item.domain || '').replace(/^www\./, '') === 'topmarketers.lol');
+  discoveredDataFastWebsiteId = website?.id || website?._id || website?.websiteId || null;
+  if (!discoveredDataFastWebsiteId) throw new Error('DataFast could not find topmarketers.lol; configure DATAFAST_WEBSITE_ID.');
+  return discoveredDataFastWebsiteId;
+}
 
 async function fetchDataFast(pathname, params = {}) {
   const apiKey = process.env.DATAFAST_API_KEY;
   if (!apiKey) return null;
   const query = new URLSearchParams(params);
   if (apiKey.startsWith('dft_')) {
-    if (!process.env.DATAFAST_WEBSITE_ID) throw new Error('DATAFAST_WEBSITE_ID is required with a dft_ account token');
-    query.set('websiteId', process.env.DATAFAST_WEBSITE_ID);
+    query.set('websiteId', await getDataFastWebsiteId(apiKey));
   }
   const dataFastResponse = await fetch(`https://datafa.st/api/v1/analytics/${pathname}?${query}`, {
     headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
